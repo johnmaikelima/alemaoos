@@ -4,9 +4,15 @@ WORKDIR /app
 
 COPY package*.json ./
 
-RUN npm install --production
+RUN npm ci
 
 COPY . .
+
+WORKDIR /app/client
+
+RUN npm ci && npm run build
+
+WORKDIR /app
 
 EXPOSE 5000
 
