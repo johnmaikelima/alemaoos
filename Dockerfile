@@ -5,9 +5,9 @@ WORKDIR /app
 COPY package*.json ./
 COPY client/package*.json ./client/
 
-RUN npm ci --legacy-peer-deps && \
+RUN npm install --legacy-peer-deps --no-audit && \
     cd client && \
-    npm ci --legacy-peer-deps && \
+    npm install --legacy-peer-deps --no-audit && \
     npm run build && \
     cd ..
 
