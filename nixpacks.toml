@@ -1,7 +1,8 @@
 [build]
 cmds = [
-  "npm install --legacy-peer-deps",
-  "cd client && npm install --legacy-peer-deps && npm run build"
+  "rm -rf node_modules/.cache 2>/dev/null || true",
+  "npm install --legacy-peer-deps --no-audit",
+  "cd client && npm install --legacy-peer-deps --no-audit && npm run build"
 ]
 
 [start]
