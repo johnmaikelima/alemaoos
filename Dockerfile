@@ -5,6 +5,9 @@ WORKDIR /app
 COPY package*.json ./
 COPY client/package*.json ./client/
 COPY client/public ./client/public
+COPY client/src ./client/src
+COPY client/setupProxy.js ./client/
+COPY client/.env.local ./client/
 
 RUN npm install --legacy-peer-deps --no-audit && \
     cd client && \
