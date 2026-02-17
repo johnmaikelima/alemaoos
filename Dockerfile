@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY package*.json ./
 COPY client/package*.json ./client/
+COPY client/public ./client/public
 
 RUN npm install --legacy-peer-deps --no-audit && \
     cd client && \
