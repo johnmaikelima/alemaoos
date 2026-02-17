@@ -1,20 +1,23 @@
-FROM node:22-alpine
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
 COPY package*.json ./
-COPY client/package*.json ./client/
 
-RUN npm ci --legacy-peer-deps && \
-    cd client && \
-    npm ci --legacy-peer-deps && \
-    npm run build && \
-    cd ..
+RUN npm install
 
 COPY . .
 
-EXPOSE 5000
+RUN npm run build
 
-ENV NODE_ENV=production
+FROM node:20-alpine
 
-CMD ["node", "server.js"]
+WORKDIR /app
+
+RUN npm install -g serve
+
+COPY --from=build /app/build ./build
+
+EXPOSE 3000
+
+CMD ["serve", "-s", "build", "-l", "3000"]
