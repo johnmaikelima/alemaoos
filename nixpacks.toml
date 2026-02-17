@@ -1,0 +1,11 @@
+[build]
+cmds = [
+  "npm ci --legacy-peer-deps",
+  "cd client && npm ci --legacy-peer-deps && npm run build"
+]
+
+[start]
+cmd = "node server.js"
+
+[variables]
+NODE_ENV = "production"
