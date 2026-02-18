@@ -18,6 +18,15 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
+// Servir arquivos estáticos do React build
+const clientBuildPath = join(__dirname, 'client', 'build');
+if (fs.existsSync(clientBuildPath)) {
+  console.log('Servindo arquivos estáticos do React build de:', clientBuildPath);
+  app.use(express.static(clientBuildPath));
+} else {
+  console.warn('Diretório de build do React não encontrado em:', clientBuildPath);
+}
+
 const dbPath = join(__dirname, 'database.db');
 const logosDir = join(__dirname, 'logos');
 
@@ -1300,9 +1309,14 @@ app.get('/api/debug/ordem/:id', async (req, res) => {
   }
 });
 
-// Rota para qualquer outra requisição não encontrada
-app.use((req, res) => {
-  res.status(404).json({ error: 'Rota não encontrada' });
+// Servir index.html para rotas não encontradas (React Router)
+app.get('*', (req, res) => {
+  const indexPath = join(clientBuildPath, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).json({ error: 'Rota não encontrada' });
+  }
 });
 
 const server = app.listen(PORT, () => {
