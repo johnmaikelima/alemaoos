@@ -18,6 +18,20 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
+// Servir arquivos estáticos do React build
+const clientBuildPath = join(__dirname, 'client', 'build');
+if (fs.existsSync(clientBuildPath)) {
+  console.log('Servindo arquivos estáticos do React build');
+  app.use(express.static(clientBuildPath));
+} else {
+  console.warn('Diretório de build do React não encontrado em:', clientBuildPath);
+}
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', dbReady });
+});
+
 const dbPath = join(__dirname, 'database.db');
 const logosDir = join(__dirname, 'logos');
 
@@ -28,121 +42,124 @@ if (!fs.existsSync(logosDir)) {
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Erro ao conectar ao banco de dados:', err);
+    process.exit(1);
   } else {
     console.log('Conectado ao banco de dados SQLite');
     initializeDatabase();
   }
 });
 
+db.configure('busyTimeout', 5000);
+
+let dbReady = false;
+
 function initializeDatabase() {
-  db.serialize(() => {
-    db.run(`
-      CREATE TABLE IF NOT EXISTS usuarios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT UNIQUE NOT NULL,
-        senha TEXT NOT NULL,
-        nome TEXT NOT NULL,
-        role TEXT DEFAULT 'user',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `, () => {
-      // Criar usuário admin padrão se não existir
-      db.get('SELECT * FROM usuarios WHERE role = ?', ['admin'], (err, user) => {
-        if (!user) {
-          const adminSenha = crypto.createHash('sha256').update('admin123').digest('hex');
-          db.run(
-            'INSERT INTO usuarios (email, senha, nome, role) VALUES (?, ?, ?, ?)',
-            ['admin@manageros.com', adminSenha, 'Administrador', 'admin'],
-            () => {
-              console.log('Usuário admin criado: admin@manageros.com / admin123');
-            }
-          );
-        }
-      });
-    });
+  console.log('Iniciando banco de dados...');
+  
+  try {
+    // Criar tabelas
+    db.run(`CREATE TABLE IF NOT EXISTS usuarios (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT UNIQUE NOT NULL,
+      senha TEXT NOT NULL,
+      nome TEXT NOT NULL,
+      role TEXT DEFAULT 'user',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
 
-    db.run(`
-      CREATE TABLE IF NOT EXISTS empresas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome TEXT NOT NULL,
-        cnpj TEXT,
-        endereco TEXT,
-        telefone TEXT,
-        telefone_celular TEXT,
-        telefone_fixo TEXT,
-        email TEXT,
-        logo TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+    db.run(`CREATE TABLE IF NOT EXISTS empresas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome TEXT NOT NULL,
+      cnpj TEXT,
+      endereco TEXT,
+      telefone TEXT,
+      telefone_celular TEXT,
+      telefone_fixo TEXT,
+      email TEXT,
+      logo TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
 
-    // Adicionar colunas se não existirem (para bancos existentes)
+    db.run(`CREATE TABLE IF NOT EXISTS clientes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome TEXT NOT NULL,
+      cpf_cnpj TEXT,
+      endereco TEXT,
+      telefone TEXT,
+      email TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS produtos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome TEXT NOT NULL,
+      descricao TEXT,
+      preco REAL NOT NULL,
+      tipo TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS ordens_servico (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      numero TEXT UNIQUE NOT NULL,
+      empresa_id INTEGER NOT NULL,
+      cliente_id INTEGER NOT NULL,
+      data_criacao DATETIME DEFAULT CURRENT_TIMESTAMP,
+      data_conclusao DATE,
+      status TEXT DEFAULT 'aberta',
+      descricao TEXT,
+      observacoes TEXT,
+      total REAL DEFAULT 0,
+      FOREIGN KEY (empresa_id) REFERENCES empresas(id),
+      FOREIGN KEY (cliente_id) REFERENCES clientes(id)
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS itens_ordem (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ordem_id INTEGER NOT NULL,
+      produto_id INTEGER,
+      descricao TEXT,
+      quantidade REAL DEFAULT 1,
+      valor_unitario REAL NOT NULL,
+      subtotal REAL NOT NULL,
+      FOREIGN KEY (ordem_id) REFERENCES ordens_servico(id),
+      FOREIGN KEY (produto_id) REFERENCES produtos(id)
+    )`);
+
+    // Adicionar colunas se não existirem
     db.run(`ALTER TABLE empresas ADD COLUMN telefone_celular TEXT`, (err) => {
-      if (err && !err.message.includes('duplicate column')) {
+      if (err && err.message.includes('duplicate column')) {
         console.log('Coluna telefone_celular já existe');
       }
     });
 
     db.run(`ALTER TABLE empresas ADD COLUMN telefone_fixo TEXT`, (err) => {
-      if (err && !err.message.includes('duplicate column')) {
+      if (err && err.message.includes('duplicate column')) {
         console.log('Coluna telefone_fixo já existe');
       }
     });
 
-    db.run(`
-      CREATE TABLE IF NOT EXISTS clientes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome TEXT NOT NULL,
-        cpf_cnpj TEXT,
-        endereco TEXT,
-        telefone TEXT,
-        email TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+    // Criar usuário admin padrão
+    db.get('SELECT * FROM usuarios WHERE role = ?', ['admin'], (err, user) => {
+      if (!user) {
+        const adminSenha = crypto.createHash('sha256').update('admin123').digest('hex');
+        db.run(
+          'INSERT INTO usuarios (email, senha, nome, role) VALUES (?, ?, ?, ?)',
+          ['admin@manageros.com', adminSenha, 'Administrador', 'admin'],
+          (err) => {
+            if (!err) {
+              console.log('Usuário admin criado: admin@manageros.com / admin123');
+            }
+          }
+        );
+      }
+    });
 
-    db.run(`
-      CREATE TABLE IF NOT EXISTS produtos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome TEXT NOT NULL,
-        descricao TEXT,
-        preco REAL NOT NULL,
-        tipo TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    db.run(`
-      CREATE TABLE IF NOT EXISTS ordens_servico (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        numero TEXT UNIQUE NOT NULL,
-        empresa_id INTEGER NOT NULL,
-        cliente_id INTEGER NOT NULL,
-        data_criacao DATETIME DEFAULT CURRENT_TIMESTAMP,
-        data_conclusao DATE,
-        status TEXT DEFAULT 'aberta',
-        descricao TEXT,
-        observacoes TEXT,
-        total REAL DEFAULT 0,
-        FOREIGN KEY (empresa_id) REFERENCES empresas(id),
-        FOREIGN KEY (cliente_id) REFERENCES clientes(id)
-      )
-    `);
-
-    db.run(`
-      CREATE TABLE IF NOT EXISTS itens_ordem (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ordem_id INTEGER NOT NULL,
-        produto_id INTEGER,
-        descricao TEXT,
-        quantidade REAL DEFAULT 1,
-        valor_unitario REAL NOT NULL,
-        subtotal REAL NOT NULL,
-        FOREIGN KEY (ordem_id) REFERENCES ordens_servico(id),
-        FOREIGN KEY (produto_id) REFERENCES produtos(id)
-      )
-    `);
-  });
+    dbReady = true;
+    console.log('Banco de dados inicializado com sucesso');
+  } catch (error) {
+    console.error('Erro ao inicializar banco de dados:', error);
+  }
 }
 
 const dbRun = (sql, params = []) => {
@@ -1291,11 +1308,21 @@ app.get('/api/debug/ordem/:id', async (req, res) => {
   }
 });
 
-// Rota para qualquer outra requisição não encontrada
-app.use((req, res) => {
-  res.status(404).json({ error: 'Rota não encontrada' });
+// Servir index.html para rotas não encontradas (React Router)
+app.get('*', (req, res) => {
+  const indexPath = join(clientBuildPath, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).json({ error: 'Rota não encontrada' });
+  }
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
+});
+
+server.on('error', (err) => {
+  console.error('Erro ao iniciar servidor:', err);
+  process.exit(1);
 });
