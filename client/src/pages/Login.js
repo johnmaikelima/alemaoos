@@ -25,12 +25,14 @@ function Login() {
       localStorage.setItem('userRole', response.data.role);
 
       // Disparar evento customizado para atualizar App.js
+      console.log('Disparando evento userLoggedIn');
       window.dispatchEvent(new Event('userLoggedIn'));
 
       setMessage({ type: 'success', text: 'Login realizado com sucesso!' });
       setTimeout(() => {
+        console.log('Navegando para /empresas');
         navigate('/empresas');
-      }, 500);
+      }, 1000);
     } catch (error) {
       setMessage({ type: 'error', text: error.response?.data?.error || 'Erro ao fazer login' });
     } finally {

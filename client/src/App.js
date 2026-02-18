@@ -18,15 +18,21 @@ function App() {
 
   useEffect(() => {
     const handleStorageChange = () => {
+      console.log('Storage changed');
       setUserName(localStorage.getItem('userName'));
       setUserId(localStorage.getItem('userId'));
       setUserRole(localStorage.getItem('userRole'));
     };
 
     const handleUserLoggedIn = () => {
-      setUserName(localStorage.getItem('userName'));
-      setUserId(localStorage.getItem('userId'));
-      setUserRole(localStorage.getItem('userRole'));
+      console.log('userLoggedIn event received');
+      const newUserName = localStorage.getItem('userName');
+      const newUserId = localStorage.getItem('userId');
+      const newUserRole = localStorage.getItem('userRole');
+      console.log('Atualizando estado:', { newUserName, newUserId, newUserRole });
+      setUserName(newUserName);
+      setUserId(newUserId);
+      setUserRole(newUserRole);
     };
 
     window.addEventListener('storage', handleStorageChange);
