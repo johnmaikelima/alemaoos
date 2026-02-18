@@ -24,6 +24,9 @@ function Login() {
       localStorage.setItem('userEmail', response.data.email);
       localStorage.setItem('userRole', response.data.role);
 
+      // Disparar evento customizado para atualizar App.js
+      window.dispatchEvent(new Event('userLoggedIn'));
+
       setMessage({ type: 'success', text: 'Login realizado com sucesso!' });
       setTimeout(() => {
         navigate('/empresas');

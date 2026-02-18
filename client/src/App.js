@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import './App.css';
 import Login from './pages/Login';
@@ -12,9 +12,31 @@ import EditarOrdem from './pages/EditarOrdem';
 import Usuarios from './pages/Usuarios';
 
 function App() {
-  const [userName] = useState(localStorage.getItem('userName'));
-  const userId = localStorage.getItem('userId');
-  const userRole = localStorage.getItem('userRole');
+  const [userName, setUserName] = useState(localStorage.getItem('userName'));
+  const [userId, setUserId] = useState(localStorage.getItem('userId'));
+  const [userRole, setUserRole] = useState(localStorage.getItem('userRole'));
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setUserName(localStorage.getItem('userName'));
+      setUserId(localStorage.getItem('userId'));
+      setUserRole(localStorage.getItem('userRole'));
+    };
+
+    const handleUserLoggedIn = () => {
+      setUserName(localStorage.getItem('userName'));
+      setUserId(localStorage.getItem('userId'));
+      setUserRole(localStorage.getItem('userRole'));
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('userLoggedIn', handleUserLoggedIn);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('userLoggedIn', handleUserLoggedIn);
+    };
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('userId');
